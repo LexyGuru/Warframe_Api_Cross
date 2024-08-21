@@ -321,12 +321,11 @@ class GitHubMainWindow(QMainWindow):
             if readme_content is None:
                 raise Exception("Failed to download README.md")
 
-            if self.debug:
-                print(f"README content: {readme_content[:100]}...")  # Print first 100 characters
+            logging.debug(f"README content: {readme_content[:100]}...")  # Print first 100 characters
 
             html_content = markdown.markdown(readme_content, extensions=['extra', 'codehilite'])
-            if self.debug:
-                print(f"HTML content: {html_content[:100]}...")  # Print first 100 characters
+            logging.debug(f"HTML content: {html_content[:100]}...")  # Print first 100 characters
+
 
             css_content = """
                 body {
@@ -403,16 +402,17 @@ class GitHubMainWindow(QMainWindow):
             """
 
             full_html = self.create_full_html(html_content, js_content, css_content)
-            if self.debug:
-                print(f"Full HTML: {full_html[:100]}...")  # Print first 100 characters
+            logging.debug(f"Full HTML: {full_html[:100]}...")  # Print first 100 characters
 
-            self.web_view.setHtml(full_html, QUrl(self.GITHUB_RAW_URL))
+            base_url = QUrl(self.GITHUB_RAW_URL)
+            self.web_view.setHtml(full_html, base_url)
+            logging.info("Home page loaded successfully")
         except Exception as e:
+            logging.error(f"Error loading README: {str(e)}")
             error_html = f"<html><body><h1>Error loading README</h1><p>{str(e)}</p></body></html>"
             self.web_view.setHtml(error_html)
-            print(f"Error loading README: {str(e)}")
             import traceback
-            traceback.print_exc()
+            logging.error(traceback.format_exc())
 
     @staticmethod
     def create_full_html(html_content, js_content, css_content):
@@ -492,11 +492,12 @@ class GitHubMainWindow(QMainWindow):
     def download_file(filename):
         url = GitHubMainWindow.GITHUB_RAW_URL + filename
         try:
-            response = requests.get(url, timeout=10, verify=False)
+            response = requests.get(url, timeout=10, verify=True)
             response.raise_for_status()
+            logging.debug(f"Successfully downloaded {filename}")
             return response.text
         except requests.exceptions.RequestException as e:
-            print(f"Error downloading file {filename}: {str(e)}")
+            logging.error(f"Error downloading file {filename}: {str(e)}")
             return None
 
 
