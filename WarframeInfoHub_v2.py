@@ -8,6 +8,8 @@ from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
 from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt
 from PyQt6.QtGui import QDesktopServices, QFont
 from PyQt6.QtWebChannel import QWebChannel
+from PyQt6 import QtWebEngineWidgets
+
 
 # Az importálási figyelmeztetés kezelése
 import warnings
