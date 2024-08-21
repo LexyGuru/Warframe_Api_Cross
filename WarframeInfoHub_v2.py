@@ -14,7 +14,7 @@ from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings, QWebEng
 from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt, QCoreApplication
 from PyQt6.QtGui import QDesktopServices, QFont
 from PyQt6.QtWebChannel import QWebChannel
-from PyQt6.QtCore import QT_VERSION_STR
+import PyQt6
 
 
 # Figyelmeztetések kezelése
@@ -175,8 +175,8 @@ class GitHubMainWindow(QMainWindow):
         if self.debug:
             print(f"Operating System: {platform.system()} {platform.release()}")
             print(f"Python version: {sys.version}")
-            print(f"PyQt version: {Qt.PYQT_VERSION_STR}")
-            print(f"Qt version: {QT_VERSION_STR}")
+            print(f"PyQt version: {PyQt6.__version__}")
+            print(f"Qt version: {PyQt6.QtCore.QT_VERSION_STR}")
             print(f"Working directory: {os.getcwd()}")
             print(f"Temporary directory: {self.temp_dir}")
             print(f"Cache directory: {self.cache_dir}")
