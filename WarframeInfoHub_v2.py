@@ -2,20 +2,39 @@ import sys
 import platform
 import requests
 import markdown
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QScrollArea, QSizePolicy, QMessageBox
+import warnings
+import os
+import tempfile
+import logging
+import argparse
+import importlib.metadata
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QScrollArea, QSizePolicy, QMessageBox, QTextBrowser
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings
-from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt
+from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings, QWebEnginePage
+from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt, QCoreApplication
 from PyQt6.QtGui import QDesktopServices, QFont
 from PyQt6.QtWebChannel import QWebChannel
-from PyQt6 import QtWebEngineWidgets
+from PyQt6.QtCore import QT_VERSION_STR
 
 
-# Az importálási figyelmeztetés kezelése
-import warnings
+# Figyelmeztetések kezelése
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-from pkg_resources import get_distribution, DistributionNotFound
 
+# InsecureRequestWarning kezelése
+try:
+    from requests.packages.urllib3.exceptions import InsecureRequestWarning
+except ImportError:
+    try:
+        from urllib3.exceptions import InsecureRequestWarning
+    except ImportError:
+        class InsecureRequestWarning(Warning):
+            pass
+
+warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+
+# Naplózás beállítása
+logging.basicConfig(level=logging.DEBUG if '--debug' in sys.argv else logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 def check_compatibility():
     os_name = platform.system().lower()
@@ -27,8 +46,8 @@ def check_compatibility():
     missing_packages = []
     for package in required_packages:
         try:
-            get_distribution(package)
-        except DistributionNotFound:
+            importlib.metadata.version(package)
+        except importlib.metadata.PackageNotFoundError:
             missing_packages.append(package)
 
     is_compatible = True
@@ -49,7 +68,6 @@ def check_compatibility():
             f"A Python {python_version.major}.{python_version.minor} verzió nem támogatott. Python 3.6 vagy újabb szükséges.")
 
     return is_compatible, os_name, os_version, architecture, python_version, missing_packages, compatibility_issues
-
 
 def show_compatibility_popup():
     is_compatible, os_name, os_version, architecture, python_version, missing_packages, compatibility_issues = check_compatibility()
@@ -85,23 +103,84 @@ def show_compatibility_popup():
 
     return msg.exec(), is_compatible
 
+def get_platform_specific_settings():
+    system = platform.system().lower()
+    settings = {
+        'font_family': 'Arial',
+        'font_size': 10,
+        'stylesheet': ''
+    }
+
+    if system == 'windows':
+        settings['font_family'] = 'Segoe UI'
+        settings['font_size'] = 9
+    elif system == 'darwin':  # macOS
+        settings['font_family'] = 'SF Pro Text'
+        settings['font_size'] = 13
+    elif system == 'linux':
+        settings['font_family'] = 'Ubuntu'
+        settings['font_size'] = 11
+
+    settings['stylesheet'] = f"""
+        QWidget {{
+            font-family: {settings['font_family']};
+            font-size: {settings['font_size']}pt;
+        }}
+    """
+
+    return settings
+
+def get_temp_directory():
+    return tempfile.gettempdir()
+
+def get_cache_directory():
+    system = platform.system().lower()
+    if system == 'windows':
+        return os.path.join(os.environ.get('LOCALAPPDATA'), 'WarframeInfoHub')
+    elif system == 'darwin':
+        return os.path.expanduser('~/Library/Caches/WarframeInfoHub')
+    else:  # Linux és egyéb
+        return os.path.expanduser('~/.cache/WarframeInfoHub')
 
 class WebBridge(QObject):
     @pyqtSlot(str)
     def open_url(self, url):
         QDesktopServices.openUrl(QUrl(url))
 
+class CustomWebEnginePage(QWebEnginePage):
+    def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
+        print(f"JS Console: {message} (line {lineNumber}, source: {sourceID})")
+
 
 class GitHubMainWindow(QMainWindow):
     GITHUB_RAW_URL = "https://raw.githubusercontent.com/LexyGuru/Warframe_Api_Main/main/"
 
-    def __init__(self):
+    def __init__(self, debug=False):
         super().__init__()
+        self.debug = debug
+        self.platform_settings = get_platform_specific_settings()
+        self.setStyleSheet(self.platform_settings['stylesheet'])
         self.setWindowTitle("Warframe Info Hub")
         self.setGeometry(100, 100, 1200, 800)
         self.setMinimumSize(800, 600)
         self.web_bridge = WebBridge()
         self.channel = QWebChannel()
+
+        self.temp_dir = get_temp_directory()
+        self.cache_dir = get_cache_directory()
+
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+
+        if self.debug:
+            print(f"Operating System: {platform.system()} {platform.release()}")
+            print(f"Python version: {sys.version}")
+            print(f"PyQt version: {Qt.PYQT_VERSION_STR}")
+            print(f"Qt version: {QT_VERSION_STR}")
+            print(f"Working directory: {os.getcwd()}")
+            print(f"Temporary directory: {self.temp_dir}")
+            print(f"Cache directory: {self.cache_dir}")
+
         self.setup_ui()
 
     def setup_ui(self):
@@ -194,6 +273,8 @@ class GitHubMainWindow(QMainWindow):
 
     def create_web_view(self):
         web_view = QWebEngineView()
+        page = CustomWebEnginePage(self)
+        web_view.setPage(page)
         settings = web_view.settings()
         settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
         settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
@@ -208,16 +289,13 @@ class GitHubMainWindow(QMainWindow):
         profile.setHttpUserAgent(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
-        # Javított rész: javaScriptConsoleMessage tulajdonság beállítása
-        web_view.page().javaScriptConsoleMessage = self.log_javascript
-
-        # Javított rész: loadFinished signal kezelése
         web_view.loadFinished.connect(self.onLoadFinished)
 
         return web_view
 
     def load_page(self, page_name):
-        print(f"Loading page from GitHub: {page_name}")
+        if self.debug:
+            print(f"Debug: Loading page {page_name}")
         try:
             html_content = self.download_file(f"gui/{page_name}.html")
             js_content = self.download_file(f"gui/Script/{page_name}.js")
@@ -237,17 +315,16 @@ class GitHubMainWindow(QMainWindow):
 
     def load_home_page(self):
         try:
-            #readme_content = self.download_file("README.md")
-            #html_content = markdown.markdown(readme_content, extensions=['extra', 'codehilite'])
-
             readme_content = self.download_file("README.md")
             if readme_content is None:
                 raise Exception("Failed to download README.md")
 
-            print(f"README content: {readme_content[:100]}...")  # Print first 100 characters
+            if self.debug:
+                print(f"README content: {readme_content[:100]}...")  # Print first 100 characters
 
             html_content = markdown.markdown(readme_content, extensions=['extra', 'codehilite'])
-            print(f"HTML content: {html_content[:100]}...")  # Print first 100 characters
+            if self.debug:
+                print(f"HTML content: {html_content[:100]}...")  # Print first 100 characters
 
             css_content = """
                 body {
@@ -323,15 +400,9 @@ class GitHubMainWindow(QMainWindow):
                 });
             """
 
-            #full_html = self.create_full_html(html_content, js_content, css_content)
-            #self.web_view.setHtml(full_html, QUrl(self.GITHUB_RAW_URL))
-        #except Exception as e:
-            #error_html = f"<html><body><h1>Error loading README</h1><p>{str(e)}</p></body></html>"
-            #self.web_view.setHtml(error_html)
-            #print(f"Error loading README: {str(e)}")
-
             full_html = self.create_full_html(html_content, js_content, css_content)
-            print(f"Full HTML: {full_html[:100]}...")  # Print first 100 characters
+            if self.debug:
+                print(f"Full HTML: {full_html[:100]}...")  # Print first 100 characters
 
             self.web_view.setHtml(full_html, QUrl(self.GITHUB_RAW_URL))
         except Exception as e:
@@ -415,13 +486,6 @@ class GitHubMainWindow(QMainWindow):
     def log_javascript_result(self, result):
         print(f"JavaScript result: {result}")
 
-    #@staticmethod
-    #def download_file(filename):
-    #    url = GitHubMainWindow.GITHUB_RAW_URL + filename
-    #    response = requests.get(url, timeout=10)
-    #    response.raise_for_status()
-    #    return response.text
-
     @staticmethod
     def download_file(filename):
         url = GitHubMainWindow.GITHUB_RAW_URL + filename
@@ -433,24 +497,63 @@ class GitHubMainWindow(QMainWindow):
             print(f"Error downloading file {filename}: {str(e)}")
             return None
 
-if __name__ == "__main__":
+
+def initialize_application():
+    logging.info("Initializing application")
+    # Szükséges Qt attribútumok beállítása
+    QCoreApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+
+    # Az alkalmazás létrehozása
     app = QApplication(sys.argv)
 
-    # Ellenőrizzük, hogy a program debug módban fut-e
-    debug_mode = "--debug" in sys.argv
+    # WebEngine profil beállítása
+    profile = QWebEngineProfile.defaultProfile()
+    profile.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.NoPersistentCookies)
 
-    # Megjeleníti a kompatibilitási ellenőrzés eredményét
-    result, is_compatible = show_compatibility_popup()
+    # Felhasználói ügynök beállítása
+    profile.setHttpUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
-    if is_compatible or result == QMessageBox.StandardButton.Ok:
-        # Itt folytatódik a fő program
-        window = GitHubMainWindow()
-        window.show()
+    logging.info("Application initialized successfully")
+    return app
 
-        if debug_mode:
-            # Ha debug módban vagyunk, kiírjuk a konzolra
-            print("Program started in debug mode")
 
-        sys.exit(app.exec())
-    else:
-        sys.exit()
+if __name__ == "__main__":
+    try:
+        logging.info("Starting Warframe Info Hub")
+        app = initialize_application()
+
+        # Parse command line arguments
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--debug', action='store_true', help='Enable debug mode')
+        args = parser.parse_args()
+
+        # Ellenőrizzük, hogy a program debug módban fut-e
+        debug_mode = args.debug
+        logging.info(f"Debug mode: {debug_mode}")
+
+        # Megjeleníti a kompatibilitási ellenőrzés eredményét
+        result, is_compatible = show_compatibility_popup()
+        logging.info(f"Compatibility check result: {is_compatible}")
+
+        if is_compatible or result == QMessageBox.StandardButton.Ok:
+            # Itt folytatódik a fő program
+            logging.info("Creating main window")
+            window = GitHubMainWindow(debug=debug_mode)
+            window.show()
+
+            if debug_mode:
+                # Ha debug módban vagyunk, kiírjuk a konzolra
+                print("Program started in debug mode")
+
+            logging.info("Entering main event loop")
+            sys.exit(app.exec())
+        else:
+            logging.warning("Exiting due to compatibility issues")
+            sys.exit()
+    except Exception as e:
+        logging.critical(f"Critical error in main program: {str(e)}")
+        import traceback
+
+        logging.critical(traceback.format_exc())
+        sys.exit(1)
