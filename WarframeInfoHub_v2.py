@@ -237,8 +237,17 @@ class GitHubMainWindow(QMainWindow):
 
     def load_home_page(self):
         try:
+            #readme_content = self.download_file("README.md")
+            #html_content = markdown.markdown(readme_content, extensions=['extra', 'codehilite'])
+
             readme_content = self.download_file("README.md")
+            if readme_content is None:
+                raise Exception("Failed to download README.md")
+
+            print(f"README content: {readme_content[:100]}...")  # Print first 100 characters
+
             html_content = markdown.markdown(readme_content, extensions=['extra', 'codehilite'])
+            print(f"HTML content: {html_content[:100]}...")  # Print first 100 characters
 
             css_content = """
                 body {
@@ -314,12 +323,23 @@ class GitHubMainWindow(QMainWindow):
                 });
             """
 
+            #full_html = self.create_full_html(html_content, js_content, css_content)
+            #self.web_view.setHtml(full_html, QUrl(self.GITHUB_RAW_URL))
+        #except Exception as e:
+            #error_html = f"<html><body><h1>Error loading README</h1><p>{str(e)}</p></body></html>"
+            #self.web_view.setHtml(error_html)
+            #print(f"Error loading README: {str(e)}")
+
             full_html = self.create_full_html(html_content, js_content, css_content)
+            print(f"Full HTML: {full_html[:100]}...")  # Print first 100 characters
+
             self.web_view.setHtml(full_html, QUrl(self.GITHUB_RAW_URL))
         except Exception as e:
             error_html = f"<html><body><h1>Error loading README</h1><p>{str(e)}</p></body></html>"
             self.web_view.setHtml(error_html)
             print(f"Error loading README: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
     @staticmethod
     def create_full_html(html_content, js_content, css_content):
@@ -395,13 +415,23 @@ class GitHubMainWindow(QMainWindow):
     def log_javascript_result(self, result):
         print(f"JavaScript result: {result}")
 
+    #@staticmethod
+    #def download_file(filename):
+    #    url = GitHubMainWindow.GITHUB_RAW_URL + filename
+    #    response = requests.get(url, timeout=10)
+    #    response.raise_for_status()
+    #    return response.text
+
     @staticmethod
     def download_file(filename):
         url = GitHubMainWindow.GITHUB_RAW_URL + filename
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        return response.text
-
+        try:
+            response = requests.get(url, timeout=10, verify=False)
+            response.raise_for_status()
+            return response.text
+        except requests.exceptions.RequestException as e:
+            print(f"Error downloading file {filename}: {str(e)}")
+            return None
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
