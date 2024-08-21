@@ -1,5 +1,6 @@
 import sys
 import platform
+import PyQt6
 import requests
 import markdown
 import warnings
@@ -14,8 +15,9 @@ from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings, QWebEng
 from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt, QCoreApplication
 from PyQt6.QtGui import QDesktopServices, QFont
 from PyQt6.QtWebChannel import QWebChannel
-import PyQt6
 
+from PyQt6.QtCore import QT_VERSION_STR, PYQT_VERSION_STR
+print("Qt: v", QT_VERSION_STR, "\tPyQt: v", PYQT_VERSION_STR)
 
 # Figyelmeztetések kezelése
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -111,12 +113,12 @@ def get_platform_specific_settings():
         'stylesheet': ''
     }
 
-    if system == 'windows':
-        settings['font_family'] = 'Segoe UI'
-        settings['font_size'] = 9
-    elif system == 'darwin':  # macOS
+    if system == 'darwin':  # macOS
         settings['font_family'] = 'SF Pro Text'
         settings['font_size'] = 13
+    elif system == 'windows':
+        settings['font_family'] = 'Segoe UI'
+        settings['font_size'] = 9
     elif system == 'linux':
         settings['font_family'] = 'Ubuntu'
         settings['font_size'] = 11
@@ -175,8 +177,8 @@ class GitHubMainWindow(QMainWindow):
         if self.debug:
             print(f"Operating System: {platform.system()} {platform.release()}")
             print(f"Python version: {sys.version}")
-            print(f"PyQt version: {PyQt6.__version__}")
-            print(f"Qt version: {PyQt6.QtCore.QT_VERSION_STR}")
+            print(f"PyQt version: {PYQT_VERSION_STR}")
+            print(f"Qt version: {QT_VERSION_STR}")
             print(f"Working directory: {os.getcwd()}")
             print(f"Temporary directory: {self.temp_dir}")
             print(f"Cache directory: {self.cache_dir}")
