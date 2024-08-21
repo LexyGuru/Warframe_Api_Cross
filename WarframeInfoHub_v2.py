@@ -404,6 +404,9 @@ class GitHubMainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
+    # Ellenőrizzük, hogy a program debug módban fut-e
+    debug_mode = "--debug" in sys.argv
+
     # Megjeleníti a kompatibilitási ellenőrzés eredményét
     result, is_compatible = show_compatibility_popup()
 
@@ -411,6 +414,11 @@ if __name__ == "__main__":
         # Itt folytatódik a fő program
         window = GitHubMainWindow()
         window.show()
+
+        if debug_mode:
+            # Ha debug módban vagyunk, kiírjuk a konzolra
+            print("Program started in debug mode")
+
         sys.exit(app.exec())
     else:
         sys.exit()
