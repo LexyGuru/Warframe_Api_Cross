@@ -1,3 +1,11 @@
+# Copyright (c) 2024 LexyGuru
+# This file is part of the API_Warframe_Cross_GUI project, licensed under the MIT License.
+# For the full license text, see the LICENSE file in the project root.
+
+# Copyright (c) 2024 LexyGuru
+# This file is part of the API_Warframe_Cross_GUI project, licensed under the MIT License.
+# For the full license text, see the LICENSE file in the project root.
+
 import sys
 import platform
 import requests
@@ -124,7 +132,11 @@ def show_compatibility_popup():
     message += f"Python verzió: {python_version.major}.{python_version.minor}.{python_version.micro}\n\n"
 
     if missing_packages:
-        message += f"Hiányzó függőségek: {', '.join(missing_packages)}\n\n"
+        if sys.platform == 'darwin':
+            message += f"Hiányzó függőségek: {', '.join(missing_packages)}\n\n"
+            message += "Ettöl függetlenül müködik hiba eseten forditsad le az appot a gepeden\n\n"
+        if sys.platform == 'win32':
+            message += f"Hiányzó függőségek: {', '.join(missing_packages)}\n\n"
     else:
         message += "Minden szükséges függőség telepítve van.\n\n"
 
