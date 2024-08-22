@@ -1,6 +1,5 @@
 import sys
 import platform
-import PyQt6
 import requests
 import markdown
 import warnings
@@ -9,7 +8,8 @@ import tempfile
 import logging
 import argparse
 import importlib.metadata
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QScrollArea, QSizePolicy, QMessageBox, QTextBrowser
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QTreeWidget, QTreeWidgetItem,
+                             QScrollArea, QSizePolicy, QMessageBox)
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile, QWebEngineSettings, QWebEnginePage
 from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt, QCoreApplication
@@ -17,7 +17,41 @@ from PyQt6.QtGui import QDesktopServices, QFont
 from PyQt6.QtWebChannel import QWebChannel
 
 from PyQt6.QtCore import QT_VERSION_STR, PYQT_VERSION_STR
+
 print("Qt: v", QT_VERSION_STR, "\tPyQt: v", PYQT_VERSION_STR)
+
+
+def get_platform_specific_styles():
+    base_style = """
+        QMainWindow {
+            background-color: #f5f5f5;
+        }
+        QLabel {
+            font-size: 14px;
+        }
+    """
+
+    if sys.platform == 'darwin':  # macOS
+        return base_style + """
+            QTreeWidget {
+                font-size: 13px;
+            }
+            QPushButton {
+                border-radius: 5px;
+            }
+        """
+    elif sys.platform == 'win32':  # Windows
+        return base_style + """
+            QTreeWidget {
+                font-size: 11px;
+            }
+            QPushButton {
+                border-radius: 3px;
+            }
+        """
+    else:  # Linux és egyéb
+        return base_style
+
 
 # Figyelmeztetések kezelése
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -37,6 +71,7 @@ warnings.filterwarnings("ignore", category=InsecureRequestWarning)
 # Naplózás beállítása
 logging.basicConfig(level=logging.DEBUG if '--debug' in sys.argv else logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 def check_compatibility():
     os_name = platform.system().lower()
@@ -67,12 +102,15 @@ def check_compatibility():
     if python_version.major != 3 or python_version.minor < 6:
         is_compatible = False
         compatibility_issues.append(
-            f"A Python {python_version.major}.{python_version.minor} verzió nem támogatott. Python 3.6 vagy újabb szükséges.")
+            f"A Python {python_version.major}.{python_version.minor}"
+            f" verzió nem támogatott. Python 3.6 vagy újabb szükséges.")
 
     return is_compatible, os_name, os_version, architecture, python_version, missing_packages, compatibility_issues
 
+
 def show_compatibility_popup():
-    is_compatible, os_name, os_version, architecture, python_version, missing_packages, compatibility_issues = check_compatibility()
+    is_compatible, os_name, os_version, architecture, python_version, missing_packages, compatibility_issues = (
+        check_compatibility())
 
     msg = QMessageBox()
     msg.setWindowTitle("Rendszer Kompatibilitás Ellenőrzés")
@@ -105,6 +143,7 @@ def show_compatibility_popup():
 
     return msg.exec(), is_compatible
 
+
 def get_platform_specific_settings():
     system = platform.system().lower()
     settings = {
@@ -132,8 +171,10 @@ def get_platform_specific_settings():
 
     return settings
 
+
 def get_temp_directory():
     return tempfile.gettempdir()
+
 
 def get_cache_directory():
     system = platform.system().lower()
@@ -144,10 +185,12 @@ def get_cache_directory():
     else:  # Linux és egyéb
         return os.path.expanduser('~/.cache/WarframeInfoHub')
 
+
 class WebBridge(QObject):
     @pyqtSlot(str)
     def open_url(self, url):
         QDesktopServices.openUrl(QUrl(url))
+
 
 class CustomWebEnginePage(QWebEnginePage):
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
@@ -170,6 +213,8 @@ class GitHubMainWindow(QMainWindow):
 
         self.temp_dir = get_temp_directory()
         self.cache_dir = get_cache_directory()
+
+        self.setStyleSheet(get_platform_specific_styles())
 
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
@@ -206,7 +251,7 @@ class GitHubMainWindow(QMainWindow):
         scroll_area.setStyleSheet("""
             QScrollArea {
                 border: none;
-                background-color: #f0f0f0;
+                background-color: #e0e0e0;
             }
         """)
 
@@ -216,14 +261,19 @@ class GitHubMainWindow(QMainWindow):
         tree.setStyleSheet("""
             QTreeWidget {
                 border: none;
-                background-color: #f0f0f0;
+                background-color: #e0e0e0;
+                color: #333333;
             }
             QTreeWidget::item { 
-                padding: 7px;
-                border-bottom: 1px solid #e0e0e0;
+                padding: 10px;
+                border-bottom: 1px solid #c0c0c0;
+            }
+            QTreeWidget::item:hover {
+                background-color: #d0d0d0;
             }
             QTreeWidget::item:selected { 
-                background-color: #E0E0E0;
+                background-color: #b0b0b0;
+                color: #000000;
             }
             QTreeWidget::branch:has-siblings:!adjoins-item {
                 border-image: url(vline.png) 0;
@@ -289,7 +339,9 @@ class GitHubMainWindow(QMainWindow):
 
         profile = QWebEngineProfile.defaultProfile()
         profile.setHttpUserAgent(
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/91.0.4472.124 Safari/537.36")
 
         web_view.loadFinished.connect(self.onLoadFinished)
 
@@ -325,7 +377,6 @@ class GitHubMainWindow(QMainWindow):
 
             html_content = markdown.markdown(readme_content, extensions=['extra', 'codehilite'])
             logging.debug(f"HTML content: {html_content[:100]}...")  # Print first 100 characters
-
 
             css_content = """
                 body {
@@ -515,7 +566,9 @@ def initialize_application():
 
     # Felhasználói ügynök beállítása
     profile.setHttpUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/91.0.4472.124 Safari/537.36")
 
     logging.info("Application initialized successfully")
     return app
