@@ -13,6 +13,8 @@ import logging
 import argparse
 import importlib.metadata
 import json
+
+from PyQt5.QtWebEngine import QtWebEngine
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QTreeWidget, QTreeWidgetItem,
                              QScrollArea, QSizePolicy, QMessageBox, QPushButton, QLabel, QColorDialog, QDialog)
 from PyQt5.QtWebEngineWidgets import QWebEngineView, QWebEnginePage, QWebEngineSettings
@@ -20,6 +22,26 @@ from PyQt5.QtCore import QObject, pyqtSlot, QUrl, Qt, QCoreApplication, QSetting
 from PyQt5.QtGui import QDesktopServices, QFont, QFontDatabase, QColor
 from PyQt5.QtWebChannel import QWebChannel
 from PyQt5.QtCore import QT_VERSION_STR, PYQT_VERSION_STR
+
+
+def setup_qt_resources():
+    if getattr(sys, 'frozen', False):
+        # Ha a script be van fagyasztva (PyInstaller által csomagolva)
+        bundle_dir = sys._MEIPASS
+    else:
+        # Ha a script normálisan fut
+        bundle_dir = os.path.dirname(os.path.abspath(__file__))
+
+    qt_dir = os.path.join(bundle_dir, 'PyQt5', 'Qt5')
+    os.environ['QT_PLUGIN_PATH'] = os.path.join(qt_dir, 'plugins')
+    os.environ['QT_QPA_PLATFORM_PLUGIN_PATH'] = os.path.join(qt_dir, 'plugins', 'platforms')
+    os.environ['QT_WEBENGINE_ICU_DATA_DIR'] = os.path.join(qt_dir, 'lib', 'QtWebEngineCore.framework', 'Resources')
+    os.environ['QTWEBENGINE_CHROMIUM_FLAGS'] = '--no-sandbox'
+
+    # Explicit módon beállítjuk a QtWebEngine erőforrások helyét
+    QtWebEngine.initialize()
+
+
 
 # Próbáljuk importálni a QWebEngineProfile-t, ha elérhető
 try:
@@ -449,7 +471,7 @@ class GitHubMainWindow(QMainWindow):
             print(f"Operating System: {platform.system()} {platform.release()}")
             print(f"Python version: {sys.version}")
             print(f"PyQt version: {PYQT_VERSION_STR}")
-            print(f"Qt version: {Qt.qVersion()}")
+            print(f"Qt version: {QT_VERSION_STR}")
             print(f"Working directory: {os.getcwd()}")
             print(f"Temporary directory: {self.temp_dir}")
             print(f"Cache directory: {self.cache_dir}")
@@ -815,6 +837,30 @@ class GitHubMainWindow(QMainWindow):
         </html>
         """
 
+    def onLoadFinished(self, ok):
+        if ok:
+            print(f"Page loaded successfully: {self.web_view.url().toString()}")
+            self.web_view.page().runJavaScript("""
+                console.log("JavaScript executed from Python");
+                if (typeof QWebChannel !== 'undefined') {
+                    console.log("QWebChannel is defined");
+                    new QWebChannel(qt.webChannelTransport, function (channel) {
+                        window.pyotherside = channel.objects.pyotherside;
+                        console.log("QWebChannel initialized from Python");
+                        if (typeof initSearch === 'function') {
+                            console.log("Calling initSearch");
+                            initSearch();
+                        } else {
+                            console.log("initSearch is not defined");
+                        }
+                    });
+                } else {
+                    console.error("QWebChannel is not defined");
+                }
+            """, self.log_javascript_result)
+        else:
+            print(f"Page load failed: {self.web_view.url().toString()}")
+
     @staticmethod
     def download_file(filename):
         url = GitHubMainWindow.GITHUB_RAW_URL + filename
@@ -884,6 +930,7 @@ def initialize_application():
 if __name__ == "__main__":
     try:
         logging.info("Starting Warframe Info Hub")
+        setup_qt_resources()
         app = initialize_application()
 
         # Parse command line arguments
