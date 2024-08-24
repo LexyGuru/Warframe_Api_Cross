@@ -2,16 +2,13 @@
 # This file is part of the API_Warframe_Cross_GUI project, licensed under the MIT License.
 # For the full license text, see the LICENSE file in the project root.
 
-# Copyright (c) 2024 LexyGuru
-# This file is part of the API_Warframe_Cross_GUI project, licensed under the MIT License.
-# For the full license text, see the LICENSE file in the project root.
 
 import sys
 import requests
 import markdown
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QTreeWidget, QTreeWidgetItem, QScrollArea, QSizePolicy
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QScrollArea, QSizePolicy
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineProfile, QWebEngineSettings
+import PyQt6.QtWebEngineCore
 from PyQt6.QtCore import QObject, pyqtSlot, QUrl, Qt
 from PyQt6.QtGui import QDesktopServices, QFont
 from PyQt6.QtWebChannel import QWebChannel
@@ -39,7 +36,7 @@ class GitHubMainWindow(QMainWindow):
         main_layout = QHBoxLayout(central_widget)
 
         # Menü beállítása
-        menu_widget = self.create_menu_widget()
+        menu_widget = self.create_menu_widget
         menu_widget.setFixedWidth(250)  # Fix szélesség beállítása
         main_layout.addWidget(menu_widget)
 
@@ -49,6 +46,7 @@ class GitHubMainWindow(QMainWindow):
 
         self.load_home_page()
 
+    @property
     def create_menu_widget(self):
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
@@ -118,7 +116,8 @@ class GitHubMainWindow(QMainWindow):
                 tree_item = QTreeWidgetItem(parent, [item[0]])
                 tree_item.setData(0, Qt.ItemDataRole.UserRole, item[1])
 
-    def on_item_clicked(self, item, column):
+    @staticmethod
+    def on_item_clicked(item):
         callback = item.data(0, Qt.ItemDataRole.UserRole)
         if callback:
             callback()
@@ -126,16 +125,16 @@ class GitHubMainWindow(QMainWindow):
     def create_web_view(self):
         web_view = QWebEngineView()
         settings = web_view.settings()
-        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, True)
-        settings.setAttribute(QWebEngineSettings.WebAttribute.AllowRunningInsecureContent, True)
+        settings.setAttribute(PyQt6.QtWebEngineCore.QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        settings.setAttribute(PyQt6.QtWebEngineCore.QWebEngineSettings.WebAttribute.JavascriptEnabled, True)
+        settings.setAttribute(PyQt6.QtWebEngineCore.QWebEngineSettings.WebAttribute.PluginsEnabled, True)
+        settings.setAttribute(PyQt6.QtWebEngineCore.QWebEngineSettings.WebAttribute.AllowRunningInsecureContent, True)
         web_view.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         web_view.page().setWebChannel(self.channel)
         self.channel.registerObject('pyotherside', self.web_bridge)
 
-        profile = QWebEngineProfile.defaultProfile()
+        profile = PyQt6.QtWebEngineCore.QWebEngineProfile.defaultProfile()
         profile.setHttpUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
         web_view.page().javaScriptConsoleMessage = self.log_javascript
@@ -316,6 +315,7 @@ class GitHubMainWindow(QMainWindow):
         else:
             print(f"Page load failed: {self.web_view.url().toString()}")
 
+    @staticmethod
     def log_javascript(self, level, message, line, source):
         print(f"JavaScript [{level}] {message} at line {line} in {source}")
 
